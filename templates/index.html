@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BigQuery Release Notes</title>
+  <meta name="description" content="Browse and share the latest Google BigQuery release notes." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* ------------------------------------------------------------------ */
+    /*  Design Tokens                                                     */
+    /* ------------------------------------------------------------------ */
+    :root {
+      --bg:            #0c0f1a;
+      --surface:       #151929;
+      --surface-hover: #1c2137;
+      --border:        rgba(255,255,255,.06);
+      --text:          #e2e8f0;
+      --text-muted:    #8892a8;
+      --accent:        #4f8ff7;
+      --accent-glow:   rgba(79,143,247,.25);
+      --tweet-bg:      #1d9bf0;
+      --tweet-hover:   #1a8cd8;
+      --success:       #34d399;
+      --warning:       #fbbf24;
+      --danger:        #f87171;
+      --radius:        14px;
+      --radius-sm:     8px;
+      --font:          'Inter', system-ui, -apple-system, sans-serif;
+      --shadow:        0 4px 24px rgba(0,0,0,.45);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Reset & Base                                                      */
+    /* ------------------------------------------------------------------ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; }
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* subtle animated grain */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Header                                                            */
+    /* ------------------------------------------------------------------ */
+    .header {
+      position: sticky; top: 0; z-index: 100;
+      backdrop-filter: blur(18px) saturate(1.5);
+      -webkit-backdrop-filter: blur(18px) saturate(1.5);
+      background: rgba(12,15,26,.75);
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 2rem;
+    }
+    .header-inner {
+      max-width: 960px; margin: 0 auto;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 1rem; flex-wrap: wrap;
+    }
+    .brand {
+      display: flex; align-items: center; gap: .65rem;
+    }
+    .brand-icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--accent), #a78bfa);
+      border-radius: 10px;
+      display: grid; place-items: center;
+      font-weight: 800; font-size: 1rem; color: #fff;
+    }
+    .brand h1 {
+      font-size: 1.15rem; font-weight: 700; letter-spacing: -.02em;
+    }
+    .brand h1 span { color: var(--accent); }
+
+    /* Refresh button */
+    .btn-refresh {
+      display: inline-flex; align-items: center; gap: .5rem;
+      padding: .55rem 1.2rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      color: var(--text);
+      font: 500 .85rem var(--font);
+      cursor: pointer;
+      transition: background .2s, border-color .2s, box-shadow .2s;
+    }
+    .btn-refresh:hover {
+      background: var(--surface-hover);
+      border-color: rgba(255,255,255,.12);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    .btn-refresh:active { transform: scale(.97); }
+    .btn-refresh svg {
+      width: 16px; height: 16px;
+      transition: transform .4s ease;
+    }
+    .btn-refresh.is-loading svg {
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ------------------------------------------------------------------ */
+    /*  Status bar                                                        */
+    /* ------------------------------------------------------------------ */
+    .status-bar {
+      max-width: 960px; margin: 1rem auto 0; padding: 0 2rem;
+      display: flex; align-items: center; gap: .5rem;
+      font-size: .8rem; color: var(--text-muted);
+      min-height: 1.4rem;
+    }
+    .status-bar .dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      display: inline-block; flex-shrink: 0;
+    }
+    .dot--live  { background: var(--success); box-shadow: 0 0 6px var(--success); }
+    .dot--cache { background: var(--warning); }
+    .dot--err   { background: var(--danger); }
+
+    /* ------------------------------------------------------------------ */
+    /*  Main content                                                      */
+    /* ------------------------------------------------------------------ */
+    .container {
+      max-width: 960px; margin: 0 auto;
+      padding: 1.5rem 2rem 4rem;
+    }
+
+    /* skeleton shimmer */
+    .skeleton-list { display: flex; flex-direction: column; gap: 1rem; }
+    .skeleton-card {
+      height: 120px;
+      border-radius: var(--radius);
+      background: linear-gradient(110deg, var(--surface) 30%, var(--surface-hover) 50%, var(--surface) 70%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s ease-in-out infinite;
+    }
+    @keyframes shimmer { to { background-position-x: -200%; } }
+
+    /* error banner */
+    .error-banner {
+      background: rgba(248,113,113,.08);
+      border: 1px solid rgba(248,113,113,.25);
+      border-radius: var(--radius-sm);
+      padding: 1rem 1.25rem;
+      color: var(--danger);
+      font-size: .88rem;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Entry cards                                                       */
+    /* ------------------------------------------------------------------ */
+    .entry {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.4rem 1.6rem;
+      margin-bottom: 1rem;
+      transition: border-color .25s, box-shadow .25s, transform .2s;
+      animation: fadeUp .35s ease both;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .entry:hover {
+      border-color: rgba(79,143,247,.25);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    .entry-header {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: .75rem; flex-wrap: wrap;
+      margin-bottom: .85rem;
+    }
+    .entry-date {
+      font-size: 1.05rem; font-weight: 700;
+      background: linear-gradient(90deg, var(--accent), #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .entry-link {
+      font-size: .78rem; color: var(--text-muted);
+      display: inline-flex; align-items: center; gap: .3rem;
+    }
+    .entry-link:hover { color: var(--accent); }
+
+    /* Sections inside an entry */
+    .section {
+      position: relative;
+      background: rgba(255,255,255,.02);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 1rem 1.15rem;
+      margin-top: .6rem;
+      cursor: pointer;
+      transition: background .2s, border-color .2s;
+    }
+    .section:hover {
+      background: rgba(255,255,255,.04);
+      border-color: rgba(255,255,255,.1);
+    }
+    .section.is-selected {
+      border-color: var(--tweet-bg);
+      background: rgba(29,155,240,.06);
+    }
+    .section-category {
+      font-size: .72rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: .06em;
+      color: var(--accent); margin-bottom: .4rem;
+    }
+    .section-body {
+      font-size: .88rem; color: var(--text-muted); line-height: 1.65;
+    }
+    .section-body ul {
+      padding-left: 1.2rem; margin: .3rem 0;
+    }
+    .section-body li {
+      margin-bottom: .25rem;
+    }
+
+    /* tweet action bar */
+    .tweet-bar {
+      display: flex; align-items: center; gap: .5rem;
+      margin-top: .65rem;
+      opacity: 0; max-height: 0; overflow: hidden;
+      transition: opacity .25s, max-height .3s, margin-top .3s;
+    }
+    .section.is-selected .tweet-bar {
+      opacity: 1; max-height: 60px; margin-top: .75rem;
+    }
+    .btn-tweet {
+      display: inline-flex; align-items: center; gap: .4rem;
+      padding: .45rem 1rem;
+      background: var(--tweet-bg);
+      border: none; border-radius: 999px;
+      color: #fff; font: 600 .8rem var(--font);
+      cursor: pointer;
+      transition: background .2s, transform .15s;
+    }
+    .btn-tweet:hover { background: var(--tweet-hover); }
+    .btn-tweet:active { transform: scale(.95); }
+    .btn-tweet svg { width: 15px; height: 15px; }
+
+    .btn-deselect {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--text-muted); border-radius: 999px;
+      padding: .4rem .85rem; font: 500 .78rem var(--font);
+      cursor: pointer; transition: background .2s;
+    }
+    .btn-deselect:hover { background: var(--surface-hover); }
+
+    /* ------------------------------------------------------------------ */
+    /*  Toast                                                             */
+    /* ------------------------------------------------------------------ */
+    .toast {
+      position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%) translateY(100px);
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: .75rem 1.25rem;
+      font-size: .82rem; color: var(--text);
+      box-shadow: var(--shadow);
+      opacity: 0; transition: transform .35s ease, opacity .35s;
+      z-index: 200; pointer-events: none;
+    }
+    .toast.is-visible {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Responsive                                                        */
+    /* ------------------------------------------------------------------ */
+    @media (max-width: 640px) {
+      .header { padding: .85rem 1rem; }
+      .container { padding: 1rem 1rem 3rem; }
+      .entry { padding: 1rem; }
+      .brand h1 { font-size: 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="brand">
+        <div class="brand-icon">BQ</div>
+        <h1><span>BigQuery</span> Release Notes</h1>
+      </div>
+      <button id="refreshBtn" class="btn-refresh" type="button">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+             stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round"
+                d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.992 0
+                   l3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0
+                   0 1 13.803-3.7l3.181 3.182"/>
+        </svg>
+        <span>Refresh</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Status -->
+  <div class="status-bar" id="statusBar"></div>
+
+  <!-- Content -->
+  <main class="container" id="content">
+    <!-- skeleton placeholder -->
+    <div class="skeleton-list">
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+    </div>
+  </main>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // -------------------------------------------------------------------
+    //  State
+    // -------------------------------------------------------------------
+    let selectedSectionId = null;
+
+    const $ = (sel) => document.querySelector(sel);
+    const $content   = $('#content');
+    const $status    = $('#statusBar');
+    const $refresh   = $('#refreshBtn');
+    const $toast     = $('#toast');
+
+    // -------------------------------------------------------------------
+    //  Fetch release notes
+    // -------------------------------------------------------------------
+    async function fetchNotes(forceRefresh = false) {
+      $refresh.classList.add('is-loading');
+      $refresh.disabled = true;
+
+      try {
+        const url = `/api/release-notes${forceRefresh ? '?refresh=true' : ''}`;
+        const res = await fetch(url);
+        const json = await res.json();
+
+        if (!json.success) {
+          showError(json.error || 'Unknown error');
+          return;
+        }
+
+        renderNotes(json.data);
+        showStatus(json.source, json.warning);
+
+        if (forceRefresh) showToast('Feed refreshed ✓');
+      } catch (err) {
+        showError(err.message);
+      } finally {
+        $refresh.classList.remove('is-loading');
+        $refresh.disabled = false;
+      }
+    }
+
+    // -------------------------------------------------------------------
+    //  Render helpers
+    // -------------------------------------------------------------------
+    function renderNotes(entries) {
+      if (!entries.length) {
+        $content.innerHTML = '<p style="color:var(--text-muted)">No release notes found.</p>';
+        return;
+      }
+
+      $content.innerHTML = entries.map((entry, ei) => `
+        <article class="entry" style="animation-delay:${ei * .04}s">
+          <div class="entry-header">
+            <span class="entry-date">${esc(entry.date)}</span>
+            <a class="entry-link" href="${esc(entry.link)}" target="_blank" rel="noopener">
+              View on Google Cloud
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none"
+                   viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                      d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25
+                         2.25 0 0 0 18 18.75V10.5m-4.5-6H18m0 0v4.5m0-4.5L10.5 13.5"/>
+              </svg>
+            </a>
+          </div>
+          ${entry.sections.map(s => renderSection(s, entry)).join('')}
+        </article>
+      `).join('');
+    }
+
+    function renderSection(section, entry) {
+      const isSelected = section.id === selectedSectionId;
+      return `
+        <div class="section ${isSelected ? 'is-selected' : ''}"
+             data-id="${esc(section.id)}"
+             data-plain="${esc(section.plain_text)}"
+             data-link="${esc(entry.link)}"
+             data-date="${esc(entry.date)}"
+             data-cat="${esc(section.category)}"
+             onclick="toggleSelect(this)">
+          <div class="section-category">${esc(section.category)}</div>
+          <div class="section-body">${section.body_html}</div>
+          <div class="tweet-bar">
+            <button class="btn-tweet" onclick="event.stopPropagation(); tweetSection(this.closest('.section'))">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99
+                         21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161
+                         17.52h1.833L7.084 4.126H5.117z"/>
+              </svg>
+              Post on X
+            </button>
+            <button class="btn-deselect"
+                    onclick="event.stopPropagation(); deselectAll()">Cancel</button>
+          </div>
+        </div>`;
+    }
+
+    // -------------------------------------------------------------------
+    //  Selection & Tweet
+    // -------------------------------------------------------------------
+    function toggleSelect(el) {
+      const id = el.dataset.id;
+      if (selectedSectionId === id) {
+        deselectAll();
+      } else {
+        selectedSectionId = id;
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('is-selected'));
+        el.classList.add('is-selected');
+      }
+    }
+
+    function deselectAll() {
+      selectedSectionId = null;
+      document.querySelectorAll('.section.is-selected').forEach(s => s.classList.remove('is-selected'));
+    }
+
+    function tweetSection(el) {
+      const plain = el.dataset.plain || '';
+      const link  = el.dataset.link  || '';
+      const date  = el.dataset.date  || '';
+      const cat   = el.dataset.cat   || '';
+
+      // Compose a concise tweet
+      let body = plain;
+      const maxLen = 200;
+      if (body.length > maxLen) body = body.substring(0, maxLen) + '…';
+
+      const text = `📢 BigQuery ${cat} — ${date}\n\n${body}`;
+
+      const params = new URLSearchParams({
+        text,
+        url: link,
+        hashtags: 'BigQuery,GoogleCloud',
+      });
+
+      window.open('https://twitter.com/intent/tweet?' + params.toString(), '_blank', 'width=600,height=460');
+    }
+
+    // -------------------------------------------------------------------
+    //  Status, errors, toast
+    // -------------------------------------------------------------------
+    function showStatus(source, warning) {
+      if (warning) {
+        $status.innerHTML = `<span class="dot dot--cache"></span> ${esc(warning)}`;
+      } else if (source === 'cache') {
+        $status.innerHTML = `<span class="dot dot--cache"></span> Showing cached data`;
+      } else {
+        $status.innerHTML = `<span class="dot dot--live"></span> Live feed`;
+      }
+    }
+
+    function showError(msg) {
+      $content.innerHTML = `<div class="error-banner">⚠ ${esc(msg)}</div>`;
+      $status.innerHTML  = `<span class="dot dot--err"></span> Error`;
+    }
+
+    let toastTimer;
+    function showToast(msg) {
+      $toast.textContent = msg;
+      $toast.classList.add('is-visible');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => $toast.classList.remove('is-visible'), 2500);
+    }
+
+    function esc(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    // -------------------------------------------------------------------
+    //  Boot
+    // -------------------------------------------------------------------
+    $refresh.addEventListener('click', () => fetchNotes(true));
+    fetchNotes();
+  </script>
+</body>
+</html>
